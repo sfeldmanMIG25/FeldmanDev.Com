@@ -1,9 +1,8 @@
 import { ArrowLeft, ExternalLink, FileText, Github } from "lucide-react";
 
 // === Links (public under the GitHub user below) ===
-// THESIS_URL: set to a public PDF/handle for "Tour Length Estimation Guided
-// Vehicle Routing" (RPI master's thesis) once one is hosted; empty hides the button.
-const THESIS_URL = "";
+// "Tour Length Estimation Guided Vehicle Routing" (RPI master's thesis) on ProQuest.
+const THESIS_URL = "https://www.proquest.com/openview/d4a8aaeb70d19bb62af72359b5caf7f7/1?pq-origsite=gscholar&cbl=18750&diss=y";
 const GITHUB_USER = "sfeldmanMIG25";
 const REPO_1 = {
   name: "Tour-length estimators",
