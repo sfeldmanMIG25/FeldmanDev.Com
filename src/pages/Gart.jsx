@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, FileText, Github } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, FileText, Github } from "lucide-react";
 
 // === Links (public under the GitHub user below) ===
 // "Tour Length Estimation Guided Vehicle Routing" (RPI master's thesis) on ProQuest.
@@ -23,6 +23,7 @@ export default function Gart() {
       <a className="fd-back" href="#/"><ArrowLeft size={14} /> Back to home</a>
       <div className="fd-kicker">Research</div>
       <h1>GART</h1>
+      <p className="fd-page-sub"><strong>G</strong>eometrically <strong>A</strong>ssisted <strong>R</strong>egression <strong>T</strong>ree &mdash; a tour-length estimator for the TSP.</p>
       <p className="fd-page-lead">
         How long is the optimal route before you've solved for it? GART estimates
         the length of a near-optimal tour from the geometry of the stops alone &mdash;
@@ -32,33 +33,42 @@ export default function Gart() {
 
       <div className="fd-meta">
         <div><b>Field</b><span>Operations Research</span></div>
-        <div><b>Problem</b><span>TSP tour-length estimation</span></div>
-        <div><b>Output</b><span>Thesis · 2 repos</span></div>
+        <div><b>Model</b><span>LightGBM · predicts α</span></div>
+        <div><b>Output</b><span>2 papers · thesis · 2 repos</span></div>
       </div>
 
       <h2>The idea</h2>
       <p>
         Vehicle-routing and TSP heuristics constantly ask "roughly how good would
         this set of stops be as a route?" Solving each candidate exactly is far too
-        expensive. GART learns a <strong>distribution-independent estimator</strong> of
-        tour length &mdash; one that holds up regardless of how the points are
-        distributed &mdash; so a heuristic can rank options in microseconds instead of
-        solving them.
+        expensive. GART sidesteps it: a cheap <strong>minimum spanning tree</strong> is always
+        within a bounded factor of the optimal tour, so GART learns that factor &mdash; the
+        ratio <span className="fd-mono">α = L_TSP / L_MST ∈ [1, 2]</span> &mdash; with a gradient-boosted
+        <strong> regression tree</strong> over the instance's geometry. Multiply it back by the MST
+        length and you get a <strong>distribution-independent</strong> tour-length estimate in
+        <span className="fd-mono"> O(n log n)</span>, no solver required.
       </p>
+
+      <div className="fd-linkrow">
+        <a className="fd-link-btn primary" href="#/gart-production">
+          How GART works in production <ArrowRight size={14} />
+        </a>
+      </div>
 
       <h2>Why it matters</h2>
       <p>
-        A good, cheap length estimate is leverage: it lets a solver prune,
-        prioritize, and decompose far more aggressively. The work extends classic
-        distribution-independent estimators to higher dimensions and pins down where
-        they hold and where they break.
+        A good, cheap length estimate is leverage: it lets a solver prune, prioritize, and
+        decompose far more aggressively. Because GART's features scale with dimension, it holds up
+        where classical estimators break &mdash; high-dimensional and even non-Euclidean instances &mdash;
+        reaching <strong>0.88% MAPE</strong> on multi-dimensional data and near-perfect ranking
+        (Spearman ρ = 0.9993) for ordering candidate routes.
       </p>
 
-      <h2>The work</h2>
+      <h2>The papers</h2>
       <ul>
-        <li><strong>Master's thesis</strong> &mdash; <em>Tour Length Estimation Guided Vehicle Routing</em> (Rensselaer Polytechnic Institute).</li>
-        <li><strong>Two open-source repositories</strong> with the estimators and experiments, public on GitHub.</li>
-        <li>Ongoing follow-up extending the estimators and benchmarking against strong exact solvers.</li>
+        <li><strong>GART 1.0</strong> &mdash; the original Geometrically Assisted Regression Tree: a 2D feature set with gradient-boosted regression on the MST-to-TSP ratio.</li>
+        <li><strong>GART 2.0</strong> &mdash; a 30-feature LightGBM model that scales to high dimensions and uses <strong>multidimensional scaling</strong> for realistic, non-Euclidean TSP tour-length prediction.</li>
+        <li><strong>Master's thesis</strong> &mdash; <em>Tour Length Estimation Guided Vehicle Routing</em> (Rensselaer Polytechnic Institute), applying the estimator inside a VRP heuristic.</li>
       </ul>
 
       {hasLinks ? (

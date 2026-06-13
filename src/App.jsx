@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import Nav from "./components/Nav.jsx";
 import Footer from "./components/Footer.jsx";
+import Backdrop from "./components/Backdrop.jsx";
 import Home from "./pages/Home.jsx";
 import CardWizard from "./pages/CardWizard.jsx";
 import Gart from "./pages/Gart.jsx";
+import GartProduction from "./pages/GartProduction.jsx";
 import Campbells from "./pages/Campbells.jsx";
 import Hypertherm from "./pages/Hypertherm.jsx";
 
@@ -12,6 +14,7 @@ const PAGES = {
   "/": Home,
   "/cardwizard": CardWizard,
   "/gart": Gart,
+  "/gart-production": GartProduction,
   "/campbells": Campbells,
   "/hypertherm": Hypertherm,
 };
@@ -47,6 +50,7 @@ export default function App() {
   return (
     <div className="fd">
       <div className="fd-grid-bg" />
+      <Backdrop />
       <div className="fd-wrap">
         <Nav route={route} />
         <Page />

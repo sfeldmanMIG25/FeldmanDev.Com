@@ -12,8 +12,8 @@ const PROJECTS = [
   {
     href: "#/gart", tag: "Research",
     name: "GART",
-    desc: "My thesis work: fast, distribution-independent tour-length estimators for the TSP. Published, with two open-source repos.",
-    stack: ["Operations research", "ML", "Estimation"],
+    desc: "A Geometrically Assisted Regression Tree that predicts TSP tour length from geometry alone — published research, with a production write-up and open-source repos.",
+    stack: ["Operations research", "LightGBM", "TSP"],
   },
 ];
 

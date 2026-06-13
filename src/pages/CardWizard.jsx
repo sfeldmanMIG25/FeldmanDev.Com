@@ -10,8 +10,15 @@ export default function CardWizard() {
   return (
     <article className="fd-page">
       <a className="fd-back" href="#/"><ArrowLeft size={14} /> Back to home</a>
-      <div className="fd-kicker">Android App</div>
-      <h1>CardWizard</h1>
+      <div className="fd-app-head">
+        <img className="fd-app-icon" src="/cardwizard-icon.png" width="104" height="104"
+          alt="CardWizard app icon" loading="eager" />
+        <div>
+          <div className="fd-kicker">Android App</div>
+          <h1>CardWizard</h1>
+          <p className="fd-app-tag">Which card should I pull out &mdash; right now?</p>
+        </div>
+      </div>
       <p className="fd-page-lead">
         Most people leave money on the table every time they pay, because the
         best card for a purchase depends on the category, the merchant, and the
@@ -32,6 +39,14 @@ export default function CardWizard() {
         wallet by the rewards you'd actually earn, accounting for category
         multipliers, caps, and quarterly rotations. The answer is a single,
         confident recommendation, with the runners-up a tap away.
+      </p>
+
+      <h2>It's an optimization, too</h2>
+      <p>
+        Picking the right card is a small operations-research problem in your pocket:
+        maximize the expected reward across your wallet, subject to category multipliers,
+        spending caps, and quarterly rotations. CardWizard solves that <span className="fd-mono">argmax</span> on
+        every purchase &mdash; instantly, and entirely on your device.
       </p>
 
       <h2>Privacy-first, by design</h2>
