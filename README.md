@@ -51,7 +51,7 @@ published site automatically. Then:
 | A     | @    | 185.199.109.153                         |
 | A     | @    | 185.199.110.153                         |
 | A     | @    | 185.199.111.153                         |
-| CNAME | www  | `<your-github-username>.github.io`      |
+| CNAME | www  | `sfeldmanmig25.github.io`                |
 
 (Optional IPv6 AAAA records: `2606:50c0:8000::153`, `8001::153`, `8002::153`,
 `8003::153`.)
