@@ -24,7 +24,7 @@ export default function Contact() {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           access_key: WEB3FORMS_KEY,
-          subject: "New message from feldmandevelopers.com",
+          subject: "New message from feldmandevelopers.us",
           from_name: form.name,
           name: form.name,
           email: form.email,
