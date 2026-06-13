@@ -95,7 +95,6 @@ a.fd-cv-row:hover .fd-cv-what b { color: var(--blue); }
 .fd-hp { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; opacity: 0; }
 .fd-sent { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 13px; color: var(--amber); padding: 14px 0; }
 .fd-err { font-family: var(--mono); font-size: 12px; color: #ff7676; margin-top: 12px; }
-.fd-turnstile { margin-bottom: 16px; min-height: 65px; }
 
 /* article / project pages */
 .fd-page { padding: 36px 0 80px; max-width: 760px; }
