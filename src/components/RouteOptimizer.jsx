@@ -147,10 +147,10 @@ function jacobiEVD(B, maxIterations = 100, tolerance = 1e-9) {
   return { eigenvalues, eigenvectors: V };
 }
 
-// Classical MDS
-function classicalMDS(D, dimensions = 2) {
+// Classical MDS with Adaptive Dimension selection (variance_threshold = 0.999, max_dim = 100)
+function classicalMDS(D, max_dim = 100, variance_threshold = 0.999) {
   const N = D.length;
-  if (N === 0) return [];
+  if (N === 0) return { coords: [], k: 0 };
 
   const B = Array.from({ length: N }, () => new Array(N).fill(0));
   const rowMeans = new Array(N).fill(0);
@@ -181,30 +181,89 @@ function classicalMDS(D, dimensions = 2) {
 
   pairs.sort((a, b) => b.val - a.val);
 
-  const coords = Array.from({ length: N }, () => new Array(dimensions).fill(0));
-  for (let d = 0; d < dimensions; d++) {
-    const eigenvalue = pairs[d].val;
-    if (eigenvalue > 0) {
-      const sqrtEigen = Math.sqrt(eigenvalue);
-      for (let i = 0; i < N; i++) {
-        coords[i][d] = pairs[d].vector[i] * sqrtEigen;
-      }
+  const posPairs = pairs.filter(p => p.val > 1e-9);
+  if (posPairs.length === 0) {
+    return { coords: Array.from({ length: N }, () => new Array(2).fill(0)), k: 2 };
+  }
+
+  const totalPositive = posPairs.reduce((sum, p) => sum + p.val, 0);
+  let cumulativeSum = 0;
+  let k_nat = posPairs.length;
+  for (let i = 0; i < posPairs.length; i++) {
+    cumulativeSum += posPairs[i].val;
+    if (cumulativeSum / totalPositive >= variance_threshold) {
+      k_nat = i + 1;
+      break;
     }
   }
 
-  return coords;
+  // Cap dimension: at least 2D (for aspect ratio), at most max_dim (100) and N-1
+  const k = Math.max(2, Math.min(k_nat, max_dim, N - 1));
+
+  const coords = Array.from({ length: N }, () => new Array(k).fill(0));
+  for (let d = 0; d < k; d++) {
+    const eigenvalue = posPairs[d].val;
+    const sqrtEigen = Math.sqrt(eigenvalue);
+    for (let i = 0; i < N; i++) {
+      coords[i][d] = posPairs[d].vector[i] * sqrtEigen;
+    }
+  }
+
+  return { coords, k };
 }
 
-// Prim's algorithm to compute MST on spatial points
+// Helper mathematical functions for feature extraction
+function mean(arr) {
+  return arr.reduce((sum, v) => sum + v, 0) / arr.length;
+}
+
+function std(arr) {
+  const m = mean(arr);
+  const variance = arr.reduce((sum, v) => sum + (v - m) * (v - m), 0) / arr.length;
+  return Math.sqrt(variance);
+}
+
+function getPercentile(sortedArr, q) {
+  const L = sortedArr.length;
+  if (L === 0) return 0;
+  if (L === 1) return sortedArr[0];
+  const idx = (L - 1) * (q / 100);
+  const low = Math.floor(idx);
+  const high = Math.ceil(idx);
+  if (low === high) return sortedArr[low];
+  return sortedArr[low] + (idx - low) * (sortedArr[high] - sortedArr[low]);
+}
+
+function getSkewKurtosis(arr) {
+  const N = arr.length;
+  if (N <= 2) return { skew: 0, kurtosis: 0 };
+  const m = mean(arr);
+  let variance2 = 0;
+  let variance3 = 0;
+  let variance4 = 0;
+  for (let i = 0; i < N; i++) {
+    const diff = arr[i] - m;
+    const diff2 = diff * diff;
+    variance2 += diff2;
+    variance3 += diff2 * diff;
+    variance4 += diff2 * diff2;
+  }
+  const m2 = variance2 / N;
+  const m3 = variance3 / N;
+  const m4 = variance4 / N;
+  if (m2 < 1e-9) return { skew: 0, kurtosis: 0 };
+  const skew = m3 / Math.pow(m2, 1.5);
+  const kurtosis = (m4 / (m2 * m2)) - 3.0;
+  return { skew, kurtosis };
+}
+
+// Prim's algorithm to compute MST on spatial points in arbitrary dimensions
 function computeMST(pts) {
   const n = pts.length;
-  if (n === 0) return { weight: 0, degrees: [] };
   const inMST = new Array(n).fill(false);
   const minEdge = new Array(n).fill(Infinity);
   const parent = new Array(n).fill(-1);
   minEdge[0] = 0;
-  let totalWeight = 0;
-  const degrees = new Array(n).fill(0);
 
   for (let step = 0; step < n; step++) {
     let u = -1;
@@ -215,19 +274,15 @@ function computeMST(pts) {
     }
     if (u === -1 || minEdge[u] === Infinity) break;
     inMST[u] = true;
-    totalWeight += minEdge[u];
-    
-    if (parent[u] !== -1) {
-      degrees[u]++;
-      degrees[parent[u]]++;
-    }
 
     for (let v = 0; v < n; v++) {
       if (!inMST[v]) {
-        // Calculate 2D Euclidean distance in the coordinate space (e.g. MDS coordinates)
-        const dx = pts[u].lat - pts[v].lat;
-        const dy = pts[u].lng - pts[v].lng;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        let sumSq = 0;
+        for (let d = 0; d < pts[u].length; d++) {
+          const diff = pts[u][d] - pts[v][d];
+          sumSq += diff * diff;
+        }
+        const dist = Math.sqrt(sumSq);
         if (dist < minEdge[v]) {
           minEdge[v] = dist;
           parent[v] = u;
@@ -235,37 +290,221 @@ function computeMST(pts) {
       }
     }
   }
-  return { weight: totalWeight, degrees };
+
+  const edges = [];
+  const degrees = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const p = parent[i];
+    let sumSq = 0;
+    for (let d = 0; d < pts[i].length; d++) {
+      const diff = pts[i][d] - pts[p][d];
+      sumSq += diff * diff;
+    }
+    const dist = Math.sqrt(sumSq);
+    edges.push(dist);
+    degrees[i]++;
+    degrees[p]++;
+  }
+
+  return { edges, parent, degrees };
 }
 
-// Predict alpha using aspect ratio and leaf ratio of embedded nodes
-function estimateGart(pts, mst) {
-  const n = pts.length;
-  if (n < 3) return { length: mst.weight, alpha: 1.0 };
-  
-  let minLat = Infinity, maxLat = -Infinity;
-  let minLng = Infinity, maxLng = -Infinity;
-  for (let i = 0; i < n; i++) {
-    if (pts[i].lat < minLat) minLat = pts[i].lat;
-    if (pts[i].lat > maxLat) maxLat = pts[i].lat;
-    if (pts[i].lng < minLng) minLng = pts[i].lng;
-    if (pts[i].lng > maxLng) maxLng = pts[i].lng;
+// BFS to find farthest node in a tree
+function farthest(start, n, adj) {
+  const dists = new Array(n).fill(-1);
+  dists[start] = 0;
+  const q = [start];
+  let maxNode = start;
+  let maxDist = 0;
+  while (q.length > 0) {
+    const u = q.shift();
+    if (dists[u] > maxDist) {
+      maxDist = dists[u];
+      maxNode = u;
+    }
+    for (const edge of adj[u]) {
+      if (dists[edge.node] < 0) {
+        dists[edge.node] = dists[u] + edge.weight;
+        q.push(edge.node);
+      }
+    }
   }
-  const dLat = maxLat - minLat;
-  const dLng = maxLng - minLng;
-  const aspect = dLat > dLng ? dLat / (dLng || 1e-6) : dLng / (dLat || 1e-6);
+  return { node: maxNode, dist: maxDist };
+}
+
+// GART 2.0 Linear Regression Model Constants
+const IMPUTER_MEDIANS = [
+  75.0, 10.0, 44.87965581083406, -40.58755351580169, 5.984498748190735, 844.93915, 135.12121,
+  1179.2169, 182.3480110168457, 672.079935, 98.76577499999999, -0.10074982, 0.18379855,
+  962.720725, 473.7183135986328, 562.4901275634766, 671.4127502441406, 759.6314697265625,
+  831.2696105957032, 0.141178165, 1.288943432518626, 0.4333333333333333, 1.9732142857142858,
+  1.0214314574273804, 5.0, 11511.671691894531, 0.27728288829009773, 11.0
+];
+
+const SCALER_MEAN = [
+  249.375, 18.470588235294116, 28.034791047284557, -23.68875015562966, 1572328132684.499,
+  3738.122196621567, 502.57346286489366, 4862.412938193914, 673.1026674527895, 3511.5947888450346,
+  366.9371175936229, -0.01826675144615482, 0.47569371788046433, 4348.798859490074,
+  3073.0465209589147, 3289.270391423994, 3521.461582995284, 3742.160714971389, 3936.6414439351224,
+  0.19890262709233458, 1.5574919034603751, 0.4326395414484832, 1.9118482142857143, 1.0444403164363683,
+  6.044948973741543, 67487.26866550025, 0.3618522667821387, 36.27988476092191
+];
+
+const SCALER_SCALE = [
+  315.3203149840915, 15.49997209507478, 238.00524272036185, 237.04341287809964, 5349414727122.605,
+  5324.639484254835, 624.9179447219863, 6593.2620930553385, 858.7782723555675, 5818.55765127871,
+  509.88937831827707, 0.6692936660666947, 4.750180229956686, 6698.321850249723, 5347.062406669924,
+  5586.828081067196, 5839.438899957241, 6080.683997483192, 6294.04012534694, 0.15833109841581097,
+  0.9770442638938492, 0.09743964478494714, 0.11908319934154406, 0.29800061579380444, 3.5477540615331904,
+  129115.14101819515, 0.2837661235253147, 46.184786874225274
+];
+
+const MODEL_COEF = [
+  -0.028830027142132595, -0.019853033662624496, 6.97590524539578, 6.938635075924781,
+  -0.004473204976906619, -0.010333468288370316, 0.027562712217856146, -0.03253595735084008,
+  0.0009709867835814484, 0.40670733607154896, 0.010067076751436218, 0.0026785275369736617,
+  -0.00846400310789718, -0.026240538758362377, -0.0036046049117289735, -0.03435478643789339,
+  -0.053693439462717193, -0.14893755951539392, -0.13392250278543164, 0.09336986866279769,
+  0.014512771278885304, 0.003374544778734428, -0.048578032575419455, 0.0035127025344207667,
+  0.00017453829605398527, 0.006697876882816933, 0.0028303830061464363, 0.017331887334876124
+];
+
+const MODEL_INTERCEPT = 1.1365752951035502;
+
+const FEATURE_NAMES = [
+  'n_customers', 'dimension', 'log_bounding_hypervolume', 'log_node_density',
+  'aspect_ratio', 'centroid_dist_mean', 'centroid_dist_std',
+  'centroid_dist_max', 'centroid_dist_iqr', 'mst_edge_mean', 'mst_edge_std',
+  'mst_edge_skew', 'mst_edge_kurtosis', 'mst_edge_max', 'mst_edge_q10',
+  'mst_edge_q25', 'mst_edge_q50', 'mst_edge_q75', 'mst_edge_q90',
+  'mst_dominance_ratio', 'mst_gap_ratio', 'mst_leaf_ratio', 'mst_degree_mean',
+  'mst_degree_std', 'mst_degree_max', 'mst_diameter',
+  'mst_diameter_normalized', 'large_edge_count'
+];
+
+function predictGart(pts) {
+  const n = pts.length;
+  if (n < 3) {
+    const mst = computeMST(pts);
+    const mst_total_length = mst.edges.reduce((sum, v) => sum + v, 0);
+    return { alpha: 1.0, estimate: mst_total_length, mst_length: mst_total_length };
+  }
+  const d = pts[0].length;
+  const feats = { n_customers: n, dimension: d };
+
+  // 1. Hypervolume, Node Density, Aspect Ratio
+  const rngs = new Array(d).fill(0);
+  for (let j = 0; j < d; j++) {
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (pts[i][j] < minVal) minVal = pts[i][j];
+      if (pts[i][j] > maxVal) maxVal = pts[i][j];
+    }
+    let r = maxVal - minVal;
+    if (r < 1e-9) r = 1e-9;
+    rngs[j] = r;
+  }
+  let log_hv = 0;
+  for (let j = 0; j < d; j++) log_hv += Math.log(rngs[j]);
+  feats.log_bounding_hypervolume = log_hv;
+  feats.log_node_density = Math.log(n) - log_hv;
+  feats.aspect_ratio = Math.max(...rngs) / Math.min(...rngs);
+
+  // 2. Centroid statistics
+  const centroid = new Array(d).fill(0);
+  for (let j = 0; j < d; j++) {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += pts[i][j];
+    centroid[j] = sum / n;
+  }
+  const c_raw = [];
+  for (let i = 0; i < n; i++) {
+    let sumSq = 0;
+    for (let j = 0; j < d; j++) {
+      const diff = pts[i][j] - centroid[j];
+      sumSq += diff * diff;
+    }
+    c_raw.push(Math.sqrt(sumSq));
+  }
+  feats.centroid_dist_mean = mean(c_raw);
+  feats.centroid_dist_std = std(c_raw);
+  feats.centroid_dist_max = Math.max(...c_raw);
+  const sortedCentroidDists = [...c_raw].sort((a, b) => a - b);
+  feats.centroid_dist_iqr = getPercentile(sortedCentroidDists, 75) - getPercentile(sortedCentroidDists, 25);
+
+  // 3. MST features
+  const mst = computeMST(pts);
+  const edges = mst.edges;
+  const mst_total_length = edges.reduce((sum, v) => sum + v, 0);
+  feats.mst_total_length = mst_total_length;
+  feats.mst_edge_mean = mean(edges);
+  feats.mst_edge_std = std(edges);
+  const skewKurt = getSkewKurtosis(edges);
+  feats.mst_edge_skew = skewKurt.skew;
+  feats.mst_edge_kurtosis = skewKurt.kurtosis;
+  feats.mst_edge_max = Math.max(...edges);
+
+  const sortedEdges = [...edges].sort((a, b) => a - b);
+  feats.mst_edge_q10 = getPercentile(sortedEdges, 10);
+  feats.mst_edge_q25 = getPercentile(sortedEdges, 25);
+  feats.mst_edge_q50 = getPercentile(sortedEdges, 50);
+  feats.mst_edge_q75 = getPercentile(sortedEdges, 75);
+  feats.mst_edge_q90 = getPercentile(sortedEdges, 90);
+
+  const k_dom = Math.max(1, Math.floor(Math.sqrt(n)));
+  const largestKEdges = sortedEdges.slice(-k_dom);
+  feats.mst_dominance_ratio = largestKEdges.reduce((sum, v) => sum + v, 0) / (mst_total_length + 1e-9);
+  feats.mst_gap_ratio = feats.mst_edge_max / (feats.mst_edge_q50 + 1e-9);
 
   let leafCount = 0;
   for (let i = 0; i < n; i++) {
     if (mst.degrees[i] === 1) leafCount++;
   }
-  const leafRatio = leafCount / n;
+  feats.mst_leaf_ratio = leafCount / n;
+  feats.mst_degree_mean = mean(mst.degrees);
+  feats.mst_degree_std = std(mst.degrees);
+  feats.mst_degree_max = Math.max(...mst.degrees);
 
-  // Linear GART 1.0-style approximation on MDS coordinates
-  let alpha = 1.14 + 0.045 * Math.log(aspect + 1) + 0.06 * leafRatio - 0.002 * n;
-  alpha = Math.max(1.08, Math.min(1.36, alpha));
-  
-  return { length: alpha * mst.weight, alpha };
+  let largeEdgeCount = 0;
+  for (let i = 0; i < edges.length; i++) {
+    if (edges[i] > feats.mst_edge_mean + feats.mst_edge_std) {
+      largeEdgeCount++;
+    }
+  }
+  feats.large_edge_count = largeEdgeCount;
+
+  // 4. MST Diameter
+  const adj = Array.from({ length: n }, () => []);
+  for (let i = 1; i < n; i++) {
+    const p = mst.parent[i];
+    const w = edges[i - 1];
+    adj[i].push({ node: p, weight: w });
+    adj[p].push({ node: i, weight: w });
+  }
+  const r1 = farthest(0, n, adj);
+  const r2 = farthest(r1.node, n, adj);
+  feats.mst_diameter = r2.dist;
+  feats.mst_diameter_normalized = r2.dist / (mst_total_length + 1e-9);
+
+  let alpha = 0;
+  for (let i = 0; i < FEATURE_NAMES.length; i++) {
+    const name = FEATURE_NAMES[i];
+    let val = feats[name];
+    if (val === undefined || isNaN(val)) {
+      val = IMPUTER_MEDIANS[i];
+    }
+    const scaledVal = (val - SCALER_MEAN[i]) / SCALER_SCALE[i];
+    alpha += scaledVal * MODEL_COEF[i];
+  }
+  alpha += MODEL_INTERCEPT;
+  alpha = Math.max(1.0, Math.min(2.0, alpha));
+
+  return {
+    alpha,
+    estimate: alpha * mst_total_length,
+    mst_length: mst_total_length
+  };
 }
 
 const MERCHANTS_CATALOG = [
@@ -465,12 +704,10 @@ export default function RouteOptimizer() {
         }
       }
 
-      // Compute Classical MDS for GART Estimation
-      const mdsCoords = classicalMDS(dMatrix, 2);
-      const mdsPoints = mdsCoords.map(c => ({ lat: c[0], lng: c[1] }));
-      
-      const mdsMst = computeMST(mdsPoints);
-      const gart = estimateGart(mdsPoints, mdsMst);
+      // Compute Classical MDS for GART Estimation (adaptive dimension up to 100D, variance_threshold = 0.999)
+      const mdsResult = classicalMDS(dMatrix, 100, 0.999);
+      const mdsCoords = mdsResult.coords;
+      const gart = predictGart(mdsCoords);
 
       const snaps = solve2OptTSP(dMatrix);
       const initLen = networkTourLen(snaps[0], dMatrix);
@@ -482,10 +719,10 @@ export default function RouteOptimizer() {
         const last = snaps[snaps.length - 1];
         drawTourOnStreets(stopIndices, last, true);
         const finalLen = networkTourLen(last, dMatrix);
-        const gartErr = ((gart.length - finalLen) / finalLen) * 100;
+        const gartErr = ((gart.estimate - finalLen) / finalLen) * 100;
         setHud((h) => ({ 
           ...h, size, len: finalLen, saved: (1 - finalLen / initLen) * 100, inst, done: true,
-          mstLen: mdsMst.weight, gartLen: gart.length, gartErr
+          mstLen: gart.mst_length, gartLen: gart.estimate, gartErr
         }));
         return;
       }
@@ -498,11 +735,11 @@ export default function RouteOptimizer() {
         const done = s >= snaps.length - 1;
         drawTourOnStreets(stopIndices, order, done);
         
-        const gartErr = done ? ((gart.length - len) / len) * 100 : 0;
+        const gartErr = done ? ((gart.estimate - len) / len) * 100 : 0;
 
         setHud((h) => ({ 
           ...h, size, len, saved: (1 - len / initLen) * 100, inst, done,
-          mstLen: mdsMst.weight, gartLen: gart.length, gartErr
+          mstLen: gart.mst_length, gartLen: gart.estimate, gartErr
         }));
         if (!done) { s++; timer = setTimeout(stepFn, 260); }
         else { timer = setTimeout(() => { inst += 1; runInstance(); }, 2200); }
