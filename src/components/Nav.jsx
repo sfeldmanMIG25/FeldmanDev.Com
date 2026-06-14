@@ -21,9 +21,9 @@ export default function Nav({ route }) {
         <span className="fd-mark-name">Feldman <span>Developers</span></span>
       </a>
       <div className="fd-nav-links">
-        <a onClick={() => goSection("build")}>Work</a>
-        <a onClick={() => goSection("about")}>About</a>
-        <a onClick={() => goSection("contact")}>Contact</a>
+        <a href="#/" onClick={(e) => { e.preventDefault(); goSection("build"); }}>Work</a>
+        <a href="#/" onClick={(e) => { e.preventDefault(); goSection("about"); }}>About</a>
+        <a href="#/" onClick={(e) => { e.preventDefault(); goSection("contact"); }}>Contact</a>
       </div>
     </nav>
   );

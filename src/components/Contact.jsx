@@ -17,6 +17,11 @@ export default function Contact() {
       setError("Please fill in your name, email, and a message.");
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
     setSending(true);
     try {
       const res = await fetch("https://api.web3forms.com/submit", {
@@ -61,7 +66,7 @@ export default function Contact() {
           {sent ? (
             <div className="fd-sent"><Check size={16} /> Message sent &mdash; I'll be in touch.</div>
           ) : (
-            <div>
+            <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
               <input className="fd-hp" type="text" tabIndex={-1} autoComplete="off" aria-hidden="true"
                 value={form.botcheck} onChange={(e) => setForm({ ...form, botcheck: e.target.value })} />
               <div className="fd-field"><label htmlFor="f-name">Name</label>
@@ -74,11 +79,11 @@ export default function Contact() {
                 <textarea id="f-msg" className="fd-textarea" value={form.message}
                   onChange={(e) => setForm({ ...form, message: e.target.value })}
                   placeholder="A few sentences about the problem." /></div>
-              <button className="fd-btn fd-btn-primary" onClick={submit} disabled={sending}>
+              <button className="fd-btn fd-btn-primary" type="submit" disabled={sending}>
                 {sending ? "Sending\u2026" : "Send message"} <ArrowUpRight size={15} />
               </button>
               {error && <div className="fd-err">{error}</div>}
-            </div>
+            </form>
           )}
         </div>
       </div>

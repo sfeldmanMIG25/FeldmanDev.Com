@@ -53,7 +53,9 @@ export default function App() {
       <Backdrop />
       <div className="fd-wrap">
         <Nav route={route} />
-        <Page />
+        <main id="main-content">
+          <Page />
+        </main>
         <Footer />
       </div>
     </div>

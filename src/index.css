@@ -159,4 +159,147 @@ a.fd-cv-row:hover .fd-cv-what b { color: var(--blue); }
   .fd-nav-links a:nth-child(2) { display: none; }
   .fd-app-head { gap: 16px; }
   .fd-app-icon { width: 80px; height: 80px; }
+  .fd-cw-layout { grid-template-columns: 1fr; gap: 36px; }
+}
+
+/* CardWizard Page Grid Layout */
+.fd-cw-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 48px;
+  align-items: start;
+}
+
+/* Mobile Phone Simulator Bezel */
+.phone-mockup {
+  width: 320px;
+  height: 580px;
+  border: 12px solid var(--line-2);
+  border-radius: 40px;
+  background: var(--ink);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 24px 64px -14px rgba(77,163,255,.24), 0 0 0 1px rgba(77,163,255,.1);
+  display: flex;
+  flex-direction: column;
+}
+.phone-notch {
+  width: 130px;
+  height: 18px;
+  background: var(--line-2);
+  border-radius: 0 0 14px 14px;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+.phone-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 16px 16px;
+  font-family: var(--body);
+  font-size: 13px;
+  overflow-y: auto;
+  color: var(--text);
+  scrollbar-width: none;
+}
+.phone-screen::-webkit-scrollbar {
+  display: none;
+}
+.phone-card-graphic {
+  aspect-ratio: 1.58 / 1;
+  border-radius: 10px;
+  padding: 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+  margin-top: 10px;
+}
+.phone-tab-bar {
+  display: flex;
+  border-top: 1px solid var(--line);
+  background: var(--ink-2);
+  z-index: 5;
+}
+.phone-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color .15s;
+}
+.phone-tab.active {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+/* Custom leaflet map popup */
+.fd-map-popup .leaflet-popup-content-wrapper {
+  background: #0E1422 !important;
+  color: #E7ECF6 !important;
+  border: 1px solid var(--line-2) !important;
+  border-radius: 6px !important;
+  padding: 0 !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.5) !important;
+}
+.fd-map-popup .leaflet-popup-content {
+  margin: 0 !important;
+}
+.fd-map-popup .leaflet-popup-tip {
+  background: #0E1422 !important;
+  border-left: 1px solid var(--line-2) !important;
+  border-bottom: 1px solid var(--line-2) !important;
+}
+
+/* Recruiter CV Printable CSS */
+@media print {
+  body, .fd {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+  .fd-grid-bg, .fd-math-bg, .fd-nav, .fd-map, .fd-contact-grid, .fd-hp, .phone-mockup, .fd-btn, .fd-linkrow, .fd-note {
+    display: none !important;
+  }
+  .fd-wrap {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  .fd-page {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .fd-h1, .fd-h2, h1, h2, h3, strong, b {
+    color: #000000 !important;
+  }
+  .fd-lead, p, li, span, .fd-page-lead {
+    color: #333333 !important;
+  }
+  .fd-sec {
+    border-top: 1px solid #e0e0e0 !important;
+    page-break-inside: avoid;
+  }
+  .fd-proj-grid {
+    grid-template-columns: 1fr !important;
+    background: none !important;
+    border: none !important;
+  }
+  .fd-proj {
+    background: none !important;
+    border-bottom: 1px solid #e0e0e0 !important;
+    padding: 16px 0 !important;
+  }
+  .fd-cv-row {
+    border-bottom: 1px solid #e0e0e0 !important;
+  }
 }
