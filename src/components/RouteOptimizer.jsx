@@ -21,7 +21,181 @@ const shuffle = (arr) => {
   return a;
 };
 
-// Prim's algorithm to compute MST
+// Floyd-Warshall for all-pairs shortest paths on the street network
+function computeAllPairsShortestPaths(nodes, edges, geoDistFn) {
+  const V = nodes.length;
+  const distMatrix = Array.from({ length: V }, () => new Array(V).fill(Infinity));
+  const nextMatrix = Array.from({ length: V }, () => new Array(V).fill(-1));
+
+  for (let i = 0; i < V; i++) {
+    distMatrix[i][i] = 0;
+    nextMatrix[i][i] = i;
+  }
+
+  for (const [u, v] of edges) {
+    const d = geoDistFn(nodes[u], nodes[v]);
+    distMatrix[u][v] = d;
+    distMatrix[v][u] = d;
+    nextMatrix[u][v] = v;
+    nextMatrix[v][u] = u;
+  }
+
+  for (let k = 0; k < V; k++) {
+    for (let i = 0; i < V; i++) {
+      for (let j = 0; j < V; j++) {
+        if (distMatrix[i][k] + distMatrix[k][j] < distMatrix[i][j]) {
+          distMatrix[i][j] = distMatrix[i][k] + distMatrix[k][j];
+          nextMatrix[i][j] = nextMatrix[i][k];
+        }
+      }
+    }
+  }
+
+  // Ensure fully connected distance matrix for MDS stability (straight-line fallback)
+  for (let i = 0; i < V; i++) {
+    for (let j = 0; j < V; j++) {
+      if (distMatrix[i][j] === Infinity) {
+        distMatrix[i][j] = geoDistFn(nodes[i], nodes[j]) * 1.4;
+      }
+    }
+  }
+
+  return { distMatrix, nextMatrix };
+}
+
+// Reconstruct exact street-network path
+function reconstructPath(start, end, nextMatrix) {
+  if (start === end) return [start];
+  if (nextMatrix[start][end] === -1) return [start, end];
+  const path = [start];
+  let curr = start;
+  let guard = 0;
+  while (curr !== end && guard++ < 100) {
+    curr = nextMatrix[curr][end];
+    if (curr === -1) {
+      path.push(end);
+      break;
+    }
+    path.push(curr);
+  }
+  return path;
+}
+
+// Jacobi EVD for Classical MDS
+function jacobiEVD(B, maxIterations = 100, tolerance = 1e-9) {
+  const N = B.length;
+  const A = B.map(row => [...row]);
+  const V = Array.from({ length: N }, (_, i) => {
+    const row = new Array(N).fill(0);
+    row[i] = 1;
+    return row;
+  });
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    let maxVal = 0;
+    let p = 0, q = 1;
+    for (let i = 0; i < N - 1; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const val = Math.abs(A[i][j]);
+        if (val > maxVal) {
+          maxVal = val;
+          p = i;
+          q = j;
+        }
+      }
+    }
+
+    if (maxVal < tolerance) break;
+
+    const app = A[p][p];
+    const aqq = A[q][q];
+    const apq = A[p][q];
+
+    const tau = (aqq - app) / (2 * apq);
+    const t = tau >= 0 
+      ? 1.0 / (tau + Math.sqrt(1.0 + tau * tau))
+      : -1.0 / (-tau + Math.sqrt(1.0 + tau * tau));
+
+    const c = 1.0 / Math.sqrt(1.0 + t * t);
+    const s = t * c;
+
+    A[p][p] = app - t * apq;
+    A[q][q] = aqq + t * apq;
+    A[p][q] = 0;
+    A[q][p] = 0;
+
+    for (let r = 0; r < N; r++) {
+      if (r !== p && r !== q) {
+        const arp = A[r][p];
+        const arq = A[r][q];
+        A[r][p] = c * arp - s * arq;
+        A[p][r] = A[r][p];
+        A[r][q] = s * arp + c * arq;
+        A[q][r] = A[r][q];
+      }
+    }
+
+    for (let i = 0; i < N; i++) {
+      const vip = V[i][p];
+      const viq = V[i][q];
+      V[i][p] = c * vip - s * viq;
+      V[i][q] = s * vip + c * viq;
+    }
+  }
+
+  const eigenvalues = A.map((_, i) => A[i][i]);
+  return { eigenvalues, eigenvectors: V };
+}
+
+// Classical MDS
+function classicalMDS(D, dimensions = 2) {
+  const N = D.length;
+  if (N === 0) return [];
+
+  const B = Array.from({ length: N }, () => new Array(N).fill(0));
+  const rowMeans = new Array(N).fill(0);
+  let totalMean = 0;
+
+  for (let i = 0; i < N; i++) {
+    let sum = 0;
+    for (let j = 0; j < N; j++) {
+      sum += D[i][j] * D[i][j];
+    }
+    rowMeans[i] = sum / N;
+    totalMean += sum;
+  }
+  totalMean /= (N * N);
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      B[i][j] = -0.5 * (D[i][j] * D[i][j] - rowMeans[i] - rowMeans[j] + totalMean);
+    }
+  }
+
+  const { eigenvalues, eigenvectors } = jacobiEVD(B);
+
+  const pairs = eigenvalues.map((val, idx) => ({
+    val,
+    vector: eigenvectors.map(row => row[idx])
+  }));
+
+  pairs.sort((a, b) => b.val - a.val);
+
+  const coords = Array.from({ length: N }, () => new Array(dimensions).fill(0));
+  for (let d = 0; d < dimensions; d++) {
+    const eigenvalue = pairs[d].val;
+    if (eigenvalue > 0) {
+      const sqrtEigen = Math.sqrt(eigenvalue);
+      for (let i = 0; i < N; i++) {
+        coords[i][d] = pairs[d].vector[i] * sqrtEigen;
+      }
+    }
+  }
+
+  return coords;
+}
+
+// Prim's algorithm to compute MST on spatial points
 function computeMST(pts) {
   const n = pts.length;
   if (n === 0) return { weight: 0, degrees: [] };
@@ -50,7 +224,10 @@ function computeMST(pts) {
 
     for (let v = 0; v < n; v++) {
       if (!inMST[v]) {
-        const dist = geo(pts[u], pts[v]);
+        // Calculate 2D Euclidean distance in the coordinate space (e.g. MDS coordinates)
+        const dx = pts[u].lat - pts[v].lat;
+        const dy = pts[u].lng - pts[v].lng;
+        const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < minEdge[v]) {
           minEdge[v] = dist;
           parent[v] = u;
@@ -61,7 +238,7 @@ function computeMST(pts) {
   return { weight: totalWeight, degrees };
 }
 
-// Predict alpha using aspect ratio and leaf ratio
+// Predict alpha using aspect ratio and leaf ratio of embedded nodes
 function estimateGart(pts, mst) {
   const n = pts.length;
   if (n < 3) return { length: mst.weight, alpha: 1.0 };
@@ -84,8 +261,8 @@ function estimateGart(pts, mst) {
   }
   const leafRatio = leafCount / n;
 
-  // Simplified linear regression model from GART 1.0 data
-  let alpha = 1.15 + 0.04 * Math.log(aspect + 1) + 0.06 * leafRatio - 0.002 * n;
+  // Linear GART 1.0-style approximation on MDS coordinates
+  let alpha = 1.14 + 0.045 * Math.log(aspect + 1) + 0.06 * leafRatio - 0.002 * n;
   alpha = Math.max(1.08, Math.min(1.36, alpha));
   
   return { length: alpha * mst.weight, alpha };
@@ -104,7 +281,6 @@ const MERCHANTS_CATALOG = [
   { name: "Netflix Sub", category: "streaming", card: "Blue Cash Preferred", reward: "6% cashback" }
 ];
 
-// A small grid-ish street network over Redlands, CA (OSM-style snippet).
 function buildNetwork() {
   const cLat = 34.0558, cLng = -117.1835;
   const rows = 7, cols = 8, dLat = 0.0026, dLng = 0.0030;
@@ -130,30 +306,56 @@ function buildNetwork() {
   return { nodes, edges };
 }
 
-const tourLen = (pts, order) => {
-  let s = 0;
-  for (let i = 0; i < order.length; i++) s += geo(pts[order[i]], pts[order[(i + 1) % order.length]]);
-  return s;
-};
+// 2-opt symmetric TSP solver operating on a distance matrix
+function solve2OptTSP(dMatrix) {
+  const N = dMatrix.length;
+  if (N < 3) return [[...Array(N).keys()]];
 
-function twoOptSnapshots(pts) {
-  const n = pts.length;
-  let order = shuffle([...Array(n).keys()]);
+  let order = shuffle([...Array(N).keys()]);
   const snaps = [order.slice()];
-  let improved = true, guard = 0;
+  let improved = true;
+  let guard = 0;
+
   while (improved && guard++ < 300) {
     improved = false;
-    for (let i = 0; i < n - 1; i++) {
-      for (let k = i + 1; k < n; k++) {
-        const cand = order.slice(0, i).concat(order.slice(i, k + 1).reverse(), order.slice(k + 1));
-        if (tourLen(pts, cand) + 1e-9 < tourLen(pts, order)) {
-          order = cand; snaps.push(order.slice()); improved = true;
+    for (let i = 1; i < N - 1; i++) {
+      for (let k = i + 1; k < N; k++) {
+        const prev = order[i - 1];
+        const curr = order[i];
+        const next = order[k];
+        const post = order[(k + 1) % N];
+
+        // Symmetric swap delta evaluation
+        const delta = dMatrix[prev][next] + dMatrix[curr][post] - 
+                      dMatrix[prev][curr] - dMatrix[next][post];
+
+        if (delta < -1e-9) {
+          let left = i, right = k;
+          while (left < right) {
+            const temp = order[left];
+            order[left] = order[right];
+            order[right] = temp;
+            left++;
+            right--;
+          }
+          snaps.push(order.slice());
+          improved = true;
         }
       }
     }
   }
   return snaps;
 }
+
+// Compute total network distance of a tour
+const networkTourLen = (order, dMatrix) => {
+  let sum = 0;
+  const N = order.length;
+  for (let i = 0; i < N; i++) {
+    sum += dMatrix[order[i]][order[(i + 1) % N]];
+  }
+  return sum;
+};
 
 export default function RouteOptimizer() {
   const mountRef = useRef(null);
@@ -165,6 +367,11 @@ export default function RouteOptimizer() {
     mstLen: 0, gartLen: 0, gartErr: 0
   });
   const net = useMemo(() => buildNetwork(), []);
+  
+  // Compute all-pairs shortest paths on the street network
+  const netPaths = useMemo(() => {
+    return computeAllPairsShortestPaths(net.nodes, net.edges, geo);
+  }, [net]);
 
   useEffect(() => {
     if (!mountRef.current || mapRef.current) return;
@@ -195,13 +402,26 @@ export default function RouteOptimizer() {
       markersRef.current.forEach((m) => map.removeLayer(m));
       markersRef.current = [];
     };
-    const drawTour = (pts, order, done) => {
-      const latlngs = order.map((i) => [pts[i].lat, pts[i].lng]);
-      latlngs.push(latlngs[0]);
+
+    const drawTourOnStreets = (stopIndices, order, done) => {
+      const fullPath = [];
+      for (let i = 0; i < order.length; i++) {
+        const u = stopIndices[order[i]];
+        const v = stopIndices[order[(i + 1) % order.length]];
+        const path = reconstructPath(u, v, netPaths.nextMatrix);
+        
+        for (let j = 0; j < path.length; j++) {
+          if (j > 0 || fullPath.length === 0) {
+            fullPath.push([net.nodes[path[j]].lat, net.nodes[path[j]].lng]);
+          }
+        }
+      }
+      
       const color = done ? "#FF9D3D" : "#4DA3FF";
-      if (lineRef.current) { lineRef.current.setLatLngs(latlngs); lineRef.current.setStyle({ color }); }
-      else lineRef.current = L.polyline(latlngs, { color, weight: 2.6, opacity: 0.95, interactive: false }).addTo(map);
+      if (lineRef.current) { lineRef.current.setLatLngs(fullPath); lineRef.current.setStyle({ color }); }
+      else lineRef.current = L.polyline(fullPath, { color, weight: 2.6, opacity: 0.95, interactive: false }).addTo(map);
     };
+
     const drawMarkers = (pts) => {
       pts.forEach((p, i) => {
         const m = L.circleMarker([p.lat, p.lng], {
@@ -234,24 +454,38 @@ export default function RouteOptimizer() {
     const runInstance = () => {
       if (cancelled) return;
       const size = 7 + Math.floor(Math.random() * 5);
-      const pts = shuffle([...Array(net.nodes.length).keys()]).slice(0, size).map((i) => net.nodes[i]);
-      const snaps = twoOptSnapshots(pts);
-      const initLen = tourLen(pts, snaps[0]);
+      const stopIndices = shuffle([...Array(net.nodes.length).keys()]).slice(0, size);
+      const pts = stopIndices.map(idx => net.nodes[idx]);
+
+      // Extract N x N actual street network distance sub-matrix
+      const dMatrix = Array.from({ length: size }, () => new Array(size).fill(0));
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          dMatrix[i][j] = netPaths.distMatrix[stopIndices[i]][stopIndices[j]];
+        }
+      }
+
+      // Compute Classical MDS for GART Estimation
+      const mdsCoords = classicalMDS(dMatrix, 2);
+      const mdsPoints = mdsCoords.map(c => ({ lat: c[0], lng: c[1] }));
       
-      const mst = computeMST(pts);
-      const gart = estimateGart(pts, mst);
+      const mdsMst = computeMST(mdsPoints);
+      const gart = estimateGart(mdsPoints, mdsMst);
+
+      const snaps = solve2OptTSP(dMatrix);
+      const initLen = networkTourLen(snaps[0], dMatrix);
 
       clearTsp();
       drawMarkers(pts);
 
       if (reduce) {
         const last = snaps[snaps.length - 1];
-        drawTour(pts, last, true);
-        const finalLen = tourLen(pts, last);
+        drawTourOnStreets(stopIndices, last, true);
+        const finalLen = networkTourLen(last, dMatrix);
         const gartErr = ((gart.length - finalLen) / finalLen) * 100;
         setHud((h) => ({ 
           ...h, size, len: finalLen, saved: (1 - finalLen / initLen) * 100, inst, done: true,
-          mstLen: mst.weight, gartLen: gart.length, gartErr
+          mstLen: mdsMst.weight, gartLen: gart.length, gartErr
         }));
         return;
       }
@@ -260,15 +494,15 @@ export default function RouteOptimizer() {
       const stepFn = () => {
         if (cancelled) return;
         const order = snaps[s];
-        const len = tourLen(pts, order);
+        const len = networkTourLen(order, dMatrix);
         const done = s >= snaps.length - 1;
-        drawTour(pts, order, done);
+        drawTourOnStreets(stopIndices, order, done);
         
         const gartErr = done ? ((gart.length - len) / len) * 100 : 0;
 
         setHud((h) => ({ 
           ...h, size, len, saved: (1 - len / initLen) * 100, inst, done,
-          mstLen: mst.weight, gartLen: gart.length, gartErr
+          mstLen: mdsMst.weight, gartLen: gart.length, gartErr
         }));
         if (!done) { s++; timer = setTimeout(stepFn, 260); }
         else { timer = setTimeout(() => { inst += 1; runInstance(); }, 2200); }
@@ -278,7 +512,7 @@ export default function RouteOptimizer() {
     runInstance();
 
     return () => { cancelled = true; clearTimeout(timer); map.remove(); mapRef.current = null; lineRef.current = null; markersRef.current = []; };
-  }, [net]);
+  }, [net, netPaths]);
 
   return (
     <div className="fd-map">

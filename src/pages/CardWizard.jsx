@@ -333,97 +333,95 @@ function MobileSimulator() {
 
 export default function CardWizard() {
   return (
-    <article className="fd-page" style={{ maxWidth: "980px" }}>
+    <article className="fd-page" style={{ maxWidth: "720px", margin: "0 auto" }}>
       <a className="fd-back" href="#/"><ArrowLeft size={14} /> Back to home</a>
       
-      <div className="fd-cw-layout">
+      {/* Centered App Title Area */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: "36px", width: "100%" }}>
+        <img className="fd-app-icon" src="/cardwizard-icon.png" width="104" height="104"
+          alt="CardWizard app icon" loading="eager" style={{ marginBottom: "16px", float: "none", margin: "0 auto" }} />
         <div>
-          <div className="fd-app-head">
-            <img className="fd-app-icon" src="/cardwizard-icon.png" width="104" height="104"
-              alt="CardWizard app icon" loading="eager" />
-            <div>
-              <div className="fd-kicker">Android App</div>
-              <h1>CardWizard</h1>
-              <p className="fd-app-tag">Which card should I pull out &mdash; right now?</p>
-            </div>
-          </div>
-          
-          <p className="fd-page-lead">
-            Most people leave money on the table every time they pay, because the
-            best card for a purchase depends on the category, the merchant, and the
-            rotating rules each issuer sets. CardWizard answers one question fast:
-            which card should I pull out right now?
-          </p>
-
-          <div className="fd-meta">
-            <div><b>Platform</b><span>Android</span></div>
-            <div><b>Stack</b><span>Kotlin · Jetpack Compose</span></div>
-            <div><b>Data</b><span>On-device</span></div>
-            <div><b>Status</b><span>Heading to Play Store</span></div>
-          </div>
-
-          <h2>What it does</h2>
-          <p>
-            You tell it what you're buying &mdash; or where &mdash; and it ranks your
-            wallet by the rewards you'd actually earn, accounting for category
-            multipliers, caps, and quarterly rotations. The answer is a single,
-            confident recommendation, with the runners-up a tap away.
-          </p>
-
-          <h2>It's an optimization, too</h2>
-          <p>
-            Picking the right card is a small operations-research problem in your pocket:
-            maximize the expected reward across your wallet, subject to category multipliers,
-            spending caps, and quarterly rotations. CardWizard solves that <span className="fd-mono">argmax</span> on
-            every purchase &mdash; instantly, and entirely on your device.
-          </p>
-
-          <h2>Privacy-first, by design</h2>
-          <p>
-            Your cards are some of the most sensitive things you own, so CardWizard
-            keeps them where they belong: <strong>on your phone</strong>. The
-            recommendation engine runs entirely on-device, and your card list never
-            leaves it. There's no account to make and no server holding your wallet.
-          </p>
-
-          <h2>How it stays current</h2>
-          <p>
-            Card reward structures change constantly. Rather than hand-maintaining
-            them, the app ships with a reward dataset kept fresh by an automated
-            pipeline running on GitHub Actions, so the recommendations reflect
-            current terms without you doing anything.
-          </p>
-
-          <h2>Under the hood</h2>
-          <ul>
-            <li><strong>Kotlin + Jetpack Compose</strong> for a modern, native Android UI.</li>
-            <li><strong>On-device logic</strong> &mdash; the matching and ranking run locally, fast, and offline.</li>
-            <li><strong>Automated data pipeline</strong> on GitHub Actions to keep card rules up to date.</li>
-            <li><strong>CI signing</strong> configured end-to-end (keystore + GitHub Actions) for clean release builds.</li>
-          </ul>
-
-          {(PLAY_STORE_URL || REPO_URL) ? (
-            <div className="fd-linkrow">
-              {PLAY_STORE_URL && (
-                <a className="fd-link-btn primary" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
-                  Google Play <ExternalLink size={13} />
-                </a>
-              )}
-              {REPO_URL && (
-                <a className="fd-link-btn" href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                  Source <ExternalLink size={13} />
-                </a>
-              )}
-            </div>
-          ) : (
-            <p className="fd-note">Play Store and repository links go here once they're live.</p>
-          )}
-        </div>
-
-        <div style={{ position: "sticky", top: "80px", display: "flex", justifyContent: "center" }}>
-          <MobileSimulator />
+          <div className="fd-kicker" style={{ textAlign: "center" }}>Android App</div>
+          <h1 style={{ marginTop: "4px", marginBottom: "8px" }}>CardWizard</h1>
+          <p className="fd-app-tag" style={{ color: "var(--amber)", fontSize: "15px" }}>Which card should I pull out &mdash; right now?</p>
         </div>
       </div>
+
+      {/* Centered Mobile Phone Mockup */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "44px", width: "100%" }}>
+        <MobileSimulator />
+      </div>
+      
+      <p className="fd-page-lead" style={{ textAlign: "center", fontSize: "17px", color: "var(--muted)", margin: "0 auto 32px", maxWidth: "600px" }}>
+        Most people leave money on the table every time they pay, because the
+        best card for a purchase depends on the category, the merchant, and the
+        rotating rules each issuer sets. CardWizard answers one question fast:
+        which card should I pull out right now?
+      </p>
+
+      <div className="fd-meta" style={{ justifyContent: "center", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", padding: "16px 0", marginBottom: "36px" }}>
+        <div><b>Platform</b><span>Android</span></div>
+        <div><b>Stack</b><span>Kotlin · Jetpack Compose</span></div>
+        <div><b>Data</b><span>On-device</span></div>
+        <div><b>Status</b><span>Heading to Play Store</span></div>
+      </div>
+
+      <h2>What it does</h2>
+      <p>
+        You tell it what you're buying &mdash; or where &mdash; and it ranks your
+        wallet by the rewards you'd actually earn, accounting for category
+        multipliers, caps, and quarterly rotations. The answer is a single,
+        confident recommendation, with the runners-up a tap away.
+      </p>
+
+      <h2>It's an optimization, too</h2>
+      <p>
+        Picking the right card is a small operations-research problem in your pocket:
+        maximize the expected reward across your wallet, subject to category multipliers,
+        spending caps, and quarterly rotations. CardWizard solves that <span className="fd-mono">argmax</span> on
+        every purchase &mdash; instantly, and entirely on your device.
+      </p>
+
+      <h2>Privacy-first, by design</h2>
+      <p>
+        Your cards are some of the most sensitive things you own, so CardWizard
+        keeps them where they belong: <strong>on your phone</strong>. The
+        recommendation engine runs entirely on-device, and your card list never
+        leaves it. There's no account to make and no server holding your wallet.
+      </p>
+
+      <h2>How it stays current</h2>
+      <p>
+        Card reward structures change constantly. Rather than hand-maintaining
+        them, the app ships with a reward dataset kept fresh by an automated
+        pipeline running on GitHub Actions, so the recommendations reflect
+        current terms without you doing anything.
+      </p>
+
+      <h2>Under the hood</h2>
+      <ul>
+        <li><strong>Kotlin + Jetpack Compose</strong> for a modern, native Android UI.</li>
+        <li><strong>On-device logic</strong> &mdash; the matching and ranking run locally, fast, and offline.</li>
+        <li><strong>Automated data pipeline</strong> on GitHub Actions to keep card rules up to date.</li>
+        <li><strong>CI signing</strong> configured end-to-end (keystore + GitHub Actions) for clean release builds.</li>
+      </ul>
+
+      {(PLAY_STORE_URL || REPO_URL) ? (
+        <div className="fd-linkrow" style={{ justifyContent: "center" }}>
+          {PLAY_STORE_URL && (
+            <a className="fd-link-btn primary" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
+              Google Play <ExternalLink size={13} />
+            </a>
+          )}
+          {REPO_URL && (
+            <a className="fd-link-btn" href={REPO_URL} target="_blank" rel="noopener noreferrer">
+              Source <ExternalLink size={13} />
+            </a>
+          )}
+        </div>
+      ) : (
+        <p className="fd-note" style={{ textAlign: "center" }}>Play Store and repository links go here once they're live.</p>
+      )}
     </article>
   );
 }
